@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Auto Export to USF and TPL",
     "author": "violet :3",
-    "version": (1, 1),
+    "version": (1, 0),
     "blender": (4, 4, 0),
     "location": "File > Export > glTF 2.0 > Sidebar Panel",
     "description": "Adds a button to glTF export panel to export and auto run ModelConverter.exe and convert_tpl.py",
@@ -11,21 +11,19 @@ bl_info = {
 import bpy
 import os
 import subprocess
-from bpy.props import StringProperty
-from bpy.types import AddonPreferences, Operator, OperatorFileBrowser
 
-# Preferences
+# ---------- Preferences ----------
 
-class GLTFExportAutoConvertPreferences(AddonPreferences):
+class GLTFExportAutoConvertPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
 
-    model_converter_path: StringProperty(
+    model_converter_path: bpy.props.StringProperty(
         name="ModelConverter.exe Path",
         subtype='FILE_PATH',
         description="Path to ModelConverter.exe (choose .exe file)"
     )
 
-    convert_tpl_script: StringProperty(
+    convert_tpl_script: bpy.props.StringProperty(
         name="convert_tpl.py Path",
         subtype='FILE_PATH',
         description="Path to convert_tpl.py (choose .py file)"
@@ -33,22 +31,32 @@ class GLTFExportAutoConvertPreferences(AddonPreferences):
 
     def draw(self, context):
         layout = self.layout
+
         row = layout.row(align=True)
         row.prop(self, "model_converter_path")
         row.operator("gltf_autoconvert.pick_modelconverter", text="Browse .exe")
+
         row = layout.row(align=True)
         row.prop(self, "convert_tpl_script")
         row.operator("gltf_autoconvert.pick_convertpy", text="Browse .py")
 
 
-# File picker operators
+# ---------- File picker operators ----------
 
-class GLTF_OT_pick_modelconverter(Operator, OperatorFileBrowser):
+class GLTF_OT_pick_modelconverter(bpy.types.Operator):
     bl_idname = "gltf_autoconvert.pick_modelconverter"
     bl_label = "Select ModelConverter.exe"
     bl_description = "Pick the ModelConverter.exe file"
     filename_ext = ".exe"
-    filter_glob: StringProperty(default="*.exe", options={'HIDDEN'})
+
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    filter_glob: bpy.props.StringProperty(default="*.exe", options={'HIDDEN'})
+
+    def invoke(self, context, event):
+        prefs = context.preferences.addons[__name__].preferences
+        self.filepath = prefs.model_converter_path or ""
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
 
     def execute(self, context):
         prefs = context.preferences.addons[__name__].preferences
@@ -57,12 +65,20 @@ class GLTF_OT_pick_modelconverter(Operator, OperatorFileBrowser):
         return {'FINISHED'}
 
 
-class GLTF_OT_pick_convertpy(Operator, OperatorFileBrowser):
+class GLTF_OT_pick_convertpy(bpy.types.Operator):
     bl_idname = "gltf_autoconvert.pick_convertpy"
     bl_label = "Select convert_tpl.py"
     bl_description = "Pick the convert_tpl.py file"
     filename_ext = ".py"
-    filter_glob: StringProperty(default="*.py", options={'HIDDEN'})
+
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    filter_glob: bpy.props.StringProperty(default="*.py", options={'HIDDEN'})
+
+    def invoke(self, context, event):
+        prefs = context.preferences.addons[__name__].preferences
+        self.filepath = prefs.convert_tpl_script or ""
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
 
     def execute(self, context):
         prefs = context.preferences.addons[__name__].preferences
@@ -71,7 +87,26 @@ class GLTF_OT_pick_convertpy(Operator, OperatorFileBrowser):
         return {'FINISHED'}
 
 
-# Main export operator button added to glTF export UI
+# ---------- Panel with export button ----------
+
+class GLTF_PT_auto_convert_button(bpy.types.Panel):
+    bl_label = "Auto Export to USF and TPL"
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_parent_id = "FILE_PT_operator"  # Show in export operator props panel for glTF
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        operator = context.space_data.active_operator
+        return operator is not None and operator.bl_idname == "EXPORT_SCENE_OT_gltf"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("export_scene.gltf_auto_convert_button", icon='EXPORT')
+
+
+# ---------- Main operator ----------
 
 class EXPORT_OT_gltf_auto_convert_button(bpy.types.Operator):
     """Export using current GLTF settings and then auto run ModelConverter and convert_tpl.py"""
@@ -138,30 +173,22 @@ class EXPORT_OT_gltf_auto_convert_button(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# Add button to glTF export UI Panel in the Sidebar
-
-def draw_auto_convert_button(self, context):
-    layout = self.layout
-    layout.separator()
-    layout.operator(EXPORT_OT_gltf_auto_convert_button.bl_idname, icon='EXPORT')
-
+# ---------- Register ----------
 
 classes = (
     GLTFExportAutoConvertPreferences,
     GLTF_OT_pick_modelconverter,
     GLTF_OT_pick_convertpy,
+    GLTF_PT_auto_convert_button,
     EXPORT_OT_gltf_auto_convert_button,
 )
-
 
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-    bpy.types.EXPORT_SCENE_OT_gltf.append(draw_auto_convert_button)
 
 
 def unregister():
-    bpy.types.EXPORT_SCENE_OT_gltf.remove(draw_auto_convert_button)
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 
