@@ -1,3 +1,5 @@
+# make sure you install the zip DO NOT EXCTRACT
+
 Includes 7 tools for blender to be used with the sm2 model tool (can also be used for renders)
 Tool one is sm2 bake tools It has 3 buttons prepare for bake, restore shader and connect _spec bake out output Which will allow you to bake custom textures using the custom shader
 
