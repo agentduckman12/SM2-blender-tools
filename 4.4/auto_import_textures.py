@@ -2,7 +2,7 @@ bl_info = {
     "name": "Texture Auto Importer",
     "blender": (4, 4, 0),
     "category": "SM2 Tools",
-    "version": (3, 4),
+    "version": (3, 5),
     "author": "violet :3",
     "description": "Import textures into SM2 Universal Shader for selected or all materials. Handles _cc logic and 'base color / _a' node."
 }
