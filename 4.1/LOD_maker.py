@@ -1,23 +1,24 @@
 bl_info = {
     "name": "SM2 LOD Duplicator",
     "author": "violet :3",
-    "version": (1, 3),
+    "version": (1, 4),
     "blender": (4, 1, 0),
     "location": "View3D > Sidebar > SM2 Tools",
-    "description": "Create LODs by duplicating objects and applying decimate modifiers",
+    "description": "Create LODs by duplicating objects, preserving armature modifiers, and applying decimate modifiers",
     "category": "SM2 Tools",
 }
 
 import bpy
 import re
 
-def clean_base_name(name):
-    return re.sub(r'(\.\d+|_\d+)$', '', name)
+def clean_blender_suffix(name):
+    # Only removes Blender-style .001, .002, etc — leaves custom names like _01 intact
+    return re.sub(r'\.\d+$', '', name)
 
 class SM2_OT_DuplicateLODs(bpy.types.Operator):
     bl_idname = "object.sm2_duplicate_lods"
     bl_label = "Make LODs"
-    bl_description = "Duplicate selected Meshes/Empties 5 times, parent them, and add decimates for LODs"
+    bl_description = "Duplicate selected Meshes/Empties 5 times, parent them, preserve Armature modifiers, and add Decimates"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -28,7 +29,7 @@ class SM2_OT_DuplicateLODs(bpy.types.Operator):
             return {'CANCELLED'}
 
         for obj in selected_objects:
-            base_name = clean_base_name(obj.name)
+            base_name = clean_blender_suffix(obj.name)
 
             for i in range(1, 6):
                 lod_name = f"{base_name}_lod{i}"
@@ -40,14 +41,24 @@ class SM2_OT_DuplicateLODs(bpy.types.Operator):
                 dup.name = lod_name
 
                 if dup.type == 'MESH':
+                    # Copy Armature modifiers
+                    for mod in obj.modifiers:
+                        if mod.type == 'ARMATURE':
+                            new_mod = dup.modifiers.new(name=mod.name, type='ARMATURE')
+                            new_mod.object = mod.object
+                            new_mod.use_vertex_groups = mod.use_vertex_groups
+                            new_mod.use_deform_preserve_volume = mod.use_deform_preserve_volume
+
+                    # Add and apply Decimate modifiers
                     for j in range(i):
-                        mod = dup.modifiers.new(name=f"Decimate_{j+1}", type='DECIMATE')
-                        mod.ratio = 0.5
+                        decimod = dup.modifiers.new(name=f"Decimate_{j+1}", type='DECIMATE')
+                        decimod.ratio = 0.5
 
                     bpy.context.view_layer.objects.active = dup
                     dup.select_set(True)
                     for mod in list(dup.modifiers):
-                        bpy.ops.object.modifier_apply(modifier=mod.name)
+                        if mod.type == 'DECIMATE':
+                            bpy.ops.object.modifier_apply(modifier=mod.name)
                     dup.select_set(False)
 
         return {'FINISHED'}
