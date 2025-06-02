@@ -16,3 +16,5 @@ You click that instead of clicking the normal export button And it will Automati
 Make sure you set up The directory to where the modelconverter.exe is, and the convert_tpl.py is
 
 And that is a basic description on how to use everything I will be making a video tutorial in the near future
+
+# shader created by evac
