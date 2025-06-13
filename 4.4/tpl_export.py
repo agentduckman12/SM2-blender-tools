@@ -2,10 +2,10 @@ bl_info = {
     "name": "Auto Export to USF and TPL",
     "author": "violet :3",
     "version": (1, 0),
-    "blender": (4, 4, 0),
+    "blender": (4, 1, 0),
     "location": "File > Export > glTF 2.0 > Sidebar Panel",
     "description": "Adds a button to glTF export panel to export and auto run ModelConverter.exe and convert_tpl.py",
-    "category": "SM2 Tools",
+    "category": "Import-Export",
 }
 
 import bpy
@@ -87,7 +87,7 @@ class GLTF_OT_pick_convertpy(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# ---------- Panel with export button ----------
+# ---------- Panel with export button and path selectors ----------
 
 class GLTF_PT_auto_convert_button(bpy.types.Panel):
     bl_label = "Auto Export to USF and TPL"
@@ -103,6 +103,11 @@ class GLTF_PT_auto_convert_button(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
+        prefs = context.preferences.addons.get(__name__)
+        if prefs:
+            prefs = prefs.preferences
+            layout.prop(prefs, "model_converter_path")
+            layout.prop(prefs, "convert_tpl_script")
         layout.operator("export_scene.gltf_auto_convert_button", icon='EXPORT')
 
 
@@ -118,6 +123,13 @@ class EXPORT_OT_gltf_auto_convert_button(bpy.types.Operator):
         prefs = context.preferences.addons[__name__].preferences
         model_converter = bpy.path.abspath(prefs.model_converter_path)
         convert_tpl = bpy.path.abspath(prefs.convert_tpl_script)
+
+        if not os.path.isfile(model_converter):
+            self.report({'ERROR'}, "ModelConverter.exe path invalid or not set.")
+            return {'CANCELLED'}
+        if not os.path.isfile(convert_tpl):
+            self.report({'ERROR'}, "convert_tpl.py path invalid or not set.")
+            return {'CANCELLED'}
 
         export_op = context.space_data.active_operator
         if export_op is None or export_op.bl_idname != "EXPORT_SCENE_OT_gltf":
@@ -135,7 +147,6 @@ class EXPORT_OT_gltf_auto_convert_button(bpy.types.Operator):
         for prop_name in export_op.properties.bl_rna.properties.keys():
             if prop_name not in exclude_props:
                 args[prop_name] = getattr(export_op, prop_name)
-
         args['filepath'] = export_path
 
         # Export GLTF with current settings
@@ -153,6 +164,10 @@ class EXPORT_OT_gltf_auto_convert_button(bpy.types.Operator):
             else:
                 return path
 
+        # Open project\resources\tpl folder relative to convert_tpl.py
+        tpl_folder = os.path.normpath(os.path.join(os.path.dirname(convert_tpl), "project", "resources", "tpl"))
+
+        # Build the command to run ModelConverter.exe and convert_tpl.py
         if os.name == 'nt':
             cmd = (
                 f'{quote_path(model_converter)} {quote_path(export_path)} && '
@@ -162,6 +177,10 @@ class EXPORT_OT_gltf_auto_convert_button(bpy.types.Operator):
                 ['cmd.exe', '/c', 'start', '', 'cmd.exe', '/k', cmd],
                 cwd=working_dir,
             )
+
+            # Open tpl_folder in explorer after conversion
+            subprocess.Popen(['explorer', tpl_folder])
+
         else:
             cmd = (
                 f'{quote_path(model_converter)} {quote_path(export_path)} && '
@@ -169,7 +188,10 @@ class EXPORT_OT_gltf_auto_convert_button(bpy.types.Operator):
             )
             subprocess.Popen(cmd, shell=True, cwd=working_dir)
 
-        self.report({'INFO'}, "Exported GLTF and launched auto convert processes.")
+            # Open tpl_folder in default file manager after conversion (Linux/Mac)
+            subprocess.Popen(['xdg-open', tpl_folder])
+
+        self.report({'INFO'}, "Exported GLTF and launched auto convert processes, opened TPL folder.")
         return {'FINISHED'}
 
 
